@@ -168,7 +168,7 @@ def fix_external_call_back(lmp, ntimestep, nlocal, tag, x, f):
         # stress is defined as virial/volume in lammps
         assert "stress" in results, "stress must be in results to compute virial"
         volume = torch.det(cell).abs().item()
-        v = (results["stress"].cpu() * volume)[0]
+        v = -(results["stress"].cpu() * volume)[0]
         # virials need to be in this order: xx, yy, zz, xy, xz, yz. https://docs.lammps.org/Library_utility.html#_CPPv437lammps_fix_external_set_virial_globalPvPKcPd
         virial_arr = [v[0], v[4], v[8], v[1], v[2], v[5]]
         lmp.fix_external_set_virial_global(FIX_EXT_ID, virial_arr)
