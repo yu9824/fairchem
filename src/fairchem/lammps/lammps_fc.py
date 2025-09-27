@@ -38,10 +38,10 @@ def check_atom_id_match_masses(types_arr, masses):
 
 
 def atomic_data_from_lammps_data(
-    x, atomic_numbers, nlocal, cell, periodicity, task_name
+    x, image, atomic_numbers, nlocal, cell, periodicity, task_name
 ):
     # TODO: do we need to take of care of wrapping atoms that are outside the cell?
-    pos = torch.tensor(x, dtype=torch.float32)
+    pos = torch.tensor(x, dtype=torch.float32) + torch.matmul(torch.tensor(image, dtype=torch.float32), cell[0].T)
     pbc = torch.tensor(periodicity, dtype=torch.bool).unsqueeze(0)
     edge_index = torch.empty((2, 0), dtype=torch.long)
     cell_offsets = torch.empty((0, 3), dtype=torch.float32)
@@ -151,12 +151,15 @@ def fix_external_call_back(lmp, ntimestep, nlocal, tag, x, f):
     # is there a way to check atom types are mapped correctly?
     atom_type_np = lmp.numpy.extract_atom("type")
     masses = lmp.numpy.extract_atom("mass")
+
+    image_flat = lmp.numpy.extract_atom("image")  # shape=(N,)
+    image = np.array([lmp.decode_image_flags(val) for val in image_flat])
     atomic_mass_arr = masses[atom_type_np]
     atomic_numbers = lookup_atomic_number_by_mass(atomic_mass_arr)
     boxlo, boxhi, xy, yz, xz, periodicity, box_change = lmp.extract_box()
     cell = cell_from_lammps_box(boxlo, boxhi, xy, yz, xz)
     atomic_data = atomic_data_from_lammps_data(
-        x, atomic_numbers, nlocal, cell, periodicity, lmp._task_name
+        x, image, atomic_numbers, nlocal, cell, periodicity, lmp._task_name
     )
     results = lmp._predictor.predict(atomic_data)
     assert "forces" in results, "forces must be in results"
